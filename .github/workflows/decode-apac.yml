@@ -55,6 +55,7 @@ jobs:
               found=1
             else
               echo "::warning::could not decode $f (no APAC/4-channel track?)"
+              rm -f "$out"        # never ship a partial/header-only file
             fi
           done
           [ "$found" = 1 ] || echo "nothing to decode this run"

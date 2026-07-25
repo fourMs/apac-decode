@@ -35,7 +35,7 @@ let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
     AVFormatIDKey: kAudioFormatLinearPCM,
     AVLinearPCMBitDepthKey: 32,
     AVLinearPCMIsFloatKey: true,
-    AVLinearPCMIsNonInterleaved: false,
+    AVLinearPCMIsNonInterleaved: true,
 ])
 reader.add(output)
 reader.startReading()
@@ -47,7 +47,11 @@ while let sbuf = output.copyNextSampleBuffer() {
     guard n > 0, let desc = CMSampleBufferGetFormatDescription(sbuf) else { continue }
     let fmt = AVAudioFormat(cmAudioFormatDescription: desc)
     if outFile == nil {
-        outFile = try AVAudioFile(forWriting: outURL, settings: fmt.settings)
+        // match the buffers' deinterleaved float32 layout exactly — a
+        // mismatched processing format makes ExtAudioFileWrite fail (-50)
+        outFile = try AVAudioFile(forWriting: outURL, settings: fmt.settings,
+                                  commonFormat: .pcmFormatFloat32,
+                                  interleaved: false)
     }
     guard let pcm = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n))
     else { continue }
