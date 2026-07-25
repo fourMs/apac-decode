@@ -18,9 +18,12 @@ permissions:
 
 jobs:
   decode:
-    runs-on: macos-15   # APAC decoding needs macOS 15+
+    runs-on: macos-26   # APAC decode tooling needs the macOS 26 (Tahoe) image
     steps:
       - uses: actions/checkout@v4
+
+      - name: Runner OS version
+        run: sw_vers
 
       - name: Fetch release assets
         if: github.event_name == 'release'
