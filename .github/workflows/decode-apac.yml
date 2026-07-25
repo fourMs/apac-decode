@@ -51,16 +51,23 @@ jobs:
           for f in *; do
             [ -f "$f" ] || continue
             out="${f%.*}_foa.caf"
-            echo "--- afconvert attempt on $f ---"
-            if afconvert -f caff -d LEF32@48000 "$f" "$out" \
-               || swift ../decode-apac.swift "$f" "$out"; then
-              afinfo "$out" | head -12
-              afconvert -f WAVE -d LEI24@48000 "$out" "${f%.*}_foa.wav" || true
-              found=1
-            else
-              echo "::warning::could not decode $f (no APAC/4-channel track?)"
-              rm -f "$out"        # never ship a partial/header-only file
+            echo "--- $f ---"
+            set +e
+            swift ../decode-apac.swift "$f" "$out"; rc=$?
+            set -e
+            if [ $rc -eq 2 ]; then
+              echo "::warning::$f has no 4-channel spatial track - skipped"
+              rm -f "$out"; continue
+            elif [ $rc -ne 0 ]; then
+              echo "swift decoder failed (rc=$rc), trying afconvert"
+              if ! afconvert -f caff -d LEF32@48000 "$f" "$out"; then
+                echo "::warning::could not decode $f"
+                rm -f "$out"; continue
+              fi
             fi
+            afinfo "$out" | head -12
+            afconvert -f WAVE -d LEI24@48000 "$out" "${f%.*}_foa.wav" || true
+            found=1
           done
           [ "$found" = 1 ] || echo "nothing to decode this run"
 

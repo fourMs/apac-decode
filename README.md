@@ -52,9 +52,13 @@ A 4-channel first-order ambisonics file (ambiX, W-Y-Z-X). Use it for:
 - **Binaural monitoring / rotation** in any ambisonics toolchain (e.g.
   Reaper + IEM plugins).
 
-Keep the original `.mov` too — it is the only copy of the encoded sound
-field, and the APAC track survives only transfers that preserve originals
-(AirDrop, Files, USB; *not* chat apps or "compatible" exports).
+**Upload original files only.** The APAC decoder needs the `dapa`
+configuration box inside Apple's own container. Remuxing with
+`ffmpeg -c copy` silently strips it and makes the track undecodable —
+so no size-saving track extraction: upload the whole original `.mov`.
+Keep that original around, too — it is the only copy of the encoded sound
+field, and it survives only transfers that preserve originals (AirDrop,
+Files, USB; *not* chat apps or "compatible" exports).
 
 ## Notes
 
