@@ -35,7 +35,7 @@ let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
     AVFormatIDKey: kAudioFormatLinearPCM,
     AVLinearPCMBitDepthKey: 32,
     AVLinearPCMIsFloatKey: true,
-    AVLinearPCMIsNonInterleavedKey: false,
+    AVLinearPCMIsNonInterleaved: false,
 ])
 reader.add(output)
 reader.startReading()
