@@ -48,7 +48,7 @@ let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
     AVFormatIDKey: kAudioFormatLinearPCM,
     AVLinearPCMBitDepthKey: 32,
     AVLinearPCMIsFloatKey: true,
-    AVLinearPCMIsNonInterleaved: true,
+    AVLinearPCMIsNonInterleaved: false,
 ])
 reader.add(output)
 reader.startReading()
@@ -75,7 +75,7 @@ while let sbuf = output.copyNextSampleBuffer() {
         do {
             outFile = try AVAudioFile(forWriting: outURL, settings: fileSettings,
                                       commonFormat: .pcmFormatFloat32,
-                                      interleaved: false)
+                                      interleaved: true)
         } catch { fail("file-open", error) }
     }
     guard let pcm = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n))
@@ -89,7 +89,7 @@ while let sbuf = output.copyNextSampleBuffer() {
     frames += Int64(n)
 }
 if reader.status == .failed {
-    print("error: \(reader.error?.localizedDescription ?? "unknown")")
+    print("error: \(String(describing: reader.error))")
     exit(3)
 }
 print("wrote \(frames) frames to \(outURL.path)")
