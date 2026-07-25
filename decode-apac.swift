@@ -44,14 +44,29 @@ if let d = track.formatDescriptions.first {
 
 let reader: AVAssetReader
 do { reader = try AVAssetReader(asset: asset) } catch { fail("reader-init", error) }
-let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+var readerRef: AVAssetReader = reader
+var output = AVAssetReaderTrackOutput(track: track, outputSettings: [
     AVFormatIDKey: kAudioFormatLinearPCM,
     AVLinearPCMBitDepthKey: 32,
     AVLinearPCMIsFloatKey: true,
     AVLinearPCMIsNonInterleaved: false,
 ])
 reader.add(output)
-reader.startReading()
+if !reader.startReading() {
+    // some codec routes reject explicit PCM specs: retry minimal settings
+    print("retry with minimal PCM settings (\(String(describing: reader.error)))")
+    let reader2: AVAssetReader
+    do { reader2 = try AVAssetReader(asset: asset) } catch { fail("reader2-init", error) }
+    output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+    ])
+    reader2.add(output)
+    if !reader2.startReading() {
+        print("error: \(String(describing: reader2.error))")
+        exit(3)
+    }
+    readerRef = reader2
+}
 
 var outFile: AVAudioFile?
 var frames: Int64 = 0
@@ -88,8 +103,8 @@ while let sbuf = output.copyNextSampleBuffer() {
     do { try outFile!.write(from: pcm) } catch { fail("write", error) }
     frames += Int64(n)
 }
-if reader.status == .failed {
-    print("error: \(String(describing: reader.error))")
+if readerRef.status == .failed {
+    print("error: \(String(describing: readerRef.error))")
     exit(3)
 }
 print("wrote \(frames) frames to \(outURL.path)")

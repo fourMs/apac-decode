@@ -48,7 +48,8 @@ jobs:
           for f in *; do
             [ -f "$f" ] || continue
             out="${f%.*}_foa.caf"
-            if afconvert -f caff -d LEF32@48000 "$f" "$out" 2>/dev/null \
+            echo "--- afconvert attempt on $f ---"
+            if afconvert -f caff -d LEF32@48000 "$f" "$out" \
                || swift ../decode-apac.swift "$f" "$out"; then
               afinfo "$out" | head -12
               afconvert -f WAVE -d LEI24@48000 "$out" "${f%.*}_foa.wav" || true
