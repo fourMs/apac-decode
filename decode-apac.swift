@@ -47,9 +47,18 @@ while let sbuf = output.copyNextSampleBuffer() {
     guard n > 0, let desc = CMSampleBufferGetFormatDescription(sbuf) else { continue }
     let fmt = AVAudioFormat(cmAudioFormatDescription: desc)
     if outFile == nil {
-        // match the buffers' deinterleaved float32 layout exactly — a
-        // mismatched processing format makes ExtAudioFileWrite fail (-50)
-        outFile = try AVAudioFile(forWriting: outURL, settings: fmt.settings,
+        // file settings must describe an interleaved format (CAF layout);
+        // the processing format (commonFormat/interleaved:) matches our
+        // deinterleaved float32 buffers — ExtAudioFile interleaves on write
+        let fileSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: fmt.sampleRate,
+            AVNumberOfChannelsKey: Int(fmt.channelCount),
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMIsBigEndianKey: false,
+        ]
+        outFile = try AVAudioFile(forWriting: outURL, settings: fileSettings,
                                   commonFormat: .pcmFormatFloat32,
                                   interleaved: false)
     }
