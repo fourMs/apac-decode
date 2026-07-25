@@ -1,0 +1,83 @@
+name: Decode APAC to FOA
+
+# Decodes the Apple Positional Audio Codec (spatial audio) track of iPhone
+# recordings to 4-channel first-order-ambisonics PCM, using a GitHub-hosted
+# macOS runner — no Mac needed.
+#
+# Browser-only usage: create a release, attach your .mov/.m4a as assets,
+# publish — the decoded *_foa.wav/.caf get attached to the same release.
+# Manual usage: commit files to the repo root and run this workflow.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  decode:
+    runs-on: macos-15   # APAC decoding needs macOS 15+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch release assets
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p work
+          gh release download "${{ github.event.release.tag_name }}" \
+            --pattern '*.mov' --pattern '*.MOV' \
+            --pattern '*.m4a' --pattern '*.M4A' \
+            --dir work || echo "no matching assets"
+
+      - name: Collect repo-root files
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          mkdir -p work
+          shopt -s nullglob nocaseglob
+          for f in *.mov *.m4a; do cp "$f" work/; done
+
+      - name: Decode APAC tracks
+        run: |
+          shopt -s nullglob
+          cd work
+          found=0
+          for f in *; do
+            [ -f "$f" ] || continue
+            out="${f%.*}_foa.caf"
+            if afconvert -f caff -d LEF32@48000 "$f" "$out" 2>/dev/null \
+               || swift ../decode-apac.swift "$f" "$out"; then
+              afinfo "$out" | head -12
+              afconvert -f WAVE -d LEI24@48000 "$out" "${f%.*}_foa.wav" || true
+              found=1
+            else
+              echo "::warning::could not decode $f (no APAC/4-channel track?)"
+            fi
+          done
+          [ "$found" = 1 ] || echo "nothing to decode this run"
+
+      - name: Attach results to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(work/*_foa.caf work/*_foa.wav)
+          if [ ${#files[@]} -gt 0 ]; then
+            gh release upload "${{ github.event.release.tag_name }}" \
+              "${files[@]}" --clobber
+          else
+            echo "nothing to upload"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: foa-audio
+          path: |
+            work/*_foa.caf
+            work/*_foa.wav
+          if-no-files-found: warn
