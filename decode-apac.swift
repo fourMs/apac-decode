@@ -30,7 +30,20 @@ guard let track = asset.tracks(withMediaType: .audio).first(where: { t in
     exit(2)
 }
 
-let reader = try AVAssetReader(asset: asset)
+func fail(_ stage: String, _ err: Error) -> Never {
+    FileHandle.standardError.write("STAGE \(stage) failed: \(err)\n".data(using: .utf8)!)
+    exit(4)
+}
+
+if let d = track.formatDescriptions.first {
+    let desc = d as! CMFormatDescription
+    if let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(desc)?.pointee {
+        print("track: fmt=\(asbd.mFormatID) ch=\(asbd.mChannelsPerFrame) sr=\(asbd.mSampleRate)")
+    }
+}
+
+let reader: AVAssetReader
+do { reader = try AVAssetReader(asset: asset) } catch { fail("reader-init", error) }
 let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
     AVFormatIDKey: kAudioFormatLinearPCM,
     AVLinearPCMBitDepthKey: 32,
@@ -58,16 +71,21 @@ while let sbuf = output.copyNextSampleBuffer() {
             AVLinearPCMIsFloatKey: true,
             AVLinearPCMIsBigEndianKey: false,
         ]
-        outFile = try AVAudioFile(forWriting: outURL, settings: fileSettings,
-                                  commonFormat: .pcmFormatFloat32,
-                                  interleaved: false)
+        print("buffer fmt: ch=\(fmt.channelCount) sr=\(fmt.sampleRate) interleaved=\(fmt.isInterleaved) common=\(fmt.commonFormat.rawValue)")
+        do {
+            outFile = try AVAudioFile(forWriting: outURL, settings: fileSettings,
+                                      commonFormat: .pcmFormatFloat32,
+                                      interleaved: false)
+        } catch { fail("file-open", error) }
     }
     guard let pcm = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: AVAudioFrameCount(n))
     else { continue }
     pcm.frameLength = AVAudioFrameCount(n)
-    try CMSampleBufferCopyPCMDataIntoAudioBufferList(
-        sbuf, at: 0, frameCount: Int32(n), into: pcm.mutableAudioBufferList)
-    try outFile!.write(from: pcm)
+    do {
+        try CMSampleBufferCopyPCMDataIntoAudioBufferList(
+            sbuf, at: 0, frameCount: Int32(n), into: pcm.mutableAudioBufferList)
+    } catch { fail("copy-pcm", error) }
+    do { try outFile!.write(from: pcm) } catch { fail("write", error) }
     frames += Int64(n)
 }
 if reader.status == .failed {
